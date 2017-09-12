@@ -42,7 +42,6 @@ int main(int argc, char** argv)
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
 
-
     if (vm.count("help")) {
         std::cout << desc << "\n";
         return 1;
@@ -99,30 +98,13 @@ int main(int argc, char** argv)
     const uhd::device_addrs_t device_addrs = uhd::device::find(std::string(""));
     uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(std::string(""));
 
-    usrp->set_master_clock_rate(rate); //this will leed to 128 tap Rx fir and 64 tap Tx fir
+    usrp->set_master_clock_rate(rate); //this will lead to 128 tap Rx fir and 64 tap Tx fir
 
     std::cout<<std::endl;
     std::cout<<"##############################################################################"<<std::endl;
     std::cout<<"############################## Filter API Tool ###############################"<<std::endl;
     std::cout<<"##############################################################################"<<std::endl;
     std::cout<<std::endl;
-
-    if(mode == 1) {
-        std::cout<<"##############################################################################"<<std::endl;
-        std::cout<<"############################## Filter List ###################################"<<std::endl;
-        std::cout<<"##############################################################################"<<std::endl;
-        std::cout<<std::endl;
-
-        std::vector<std::string> filter_names = usrp->get_filter_names(search_mask);
-
-        try {
-            for(int i = 0;i < filter_names.size(); i++) {
-                std::cout<<filter_names[i]<<std::endl;
-            }
-        }catch(...) {
-
-        }
-    }
 
     if(mode == 0) {
         std::cout<<"##############################################################################"<<std::endl;
@@ -137,6 +119,23 @@ int main(int argc, char** argv)
                 std::cout<<filter_names[i]<<std::endl;
                 uhd::filter_info_base::sptr filter = usrp->get_filter(filter_names[i]);
                 std::cout<<*filter<<std::endl;
+            }
+        }catch(...) {
+
+        }
+    }
+
+    if(mode == 1) {
+        std::cout<<"##############################################################################"<<std::endl;
+        std::cout<<"############################## Filter List ###################################"<<std::endl;
+        std::cout<<"##############################################################################"<<std::endl;
+        std::cout<<std::endl;
+
+        std::vector<std::string> filter_names = usrp->get_filter_names(search_mask);
+
+        try {
+            for(int i = 0;i < filter_names.size(); i++) {
+                std::cout<<filter_names[i]<<std::endl;
             }
         }catch(...) {
 
@@ -172,65 +171,29 @@ int main(int argc, char** argv)
 
     if(mode == 4) {
         std::cout<<"##############################################################################"<<std::endl;
-        std::cout<<"############################## Update FIRadsadsadadadasdad Filter #############################"<<std::endl;
+        std::cout<<"############################## Update FIR Filter #############################"<<std::endl;
         std::cout<<"##############################################################################"<<std::endl;
         std::cout<<std::endl;
         std::cout<<filter_path<<std::endl;
+
         uhd::filter_info_base::sptr filter = usrp->get_filter(filter_path);
         std::cout<<*filter<<std::endl;
 
-        uhd::digital_filter_fir<boost::int16_t>::sptr fir_filter = boost::dynamic_pointer_cast<uhd::digital_filter_fir<boost::int16_t> >(filter);
+        uhd::digital_filter_fir<boost::int16_t>::sptr fir_filter =
+          boost::dynamic_pointer_cast<
+            uhd::digital_filter_fir<boost::int16_t> >(filter);
+
         std::vector<boost::int16_t> taps_vect;
+
         taps_vect.assign(bandstop_fir_coeffs, bandstop_fir_coeffs+128);
+
         fir_filter->set_taps(taps_vect);
+
         usrp->set_filter(filter_path, filter);
 
         filter = usrp->get_filter(filter_path);
+
         std::cout<<*filter<<std::endl;
-
-        uhd::tune_request_t tune_request = uhd::tune_request_t(600.1e6, 0);
-        usrp->set_rx_freq(tune_request, 0);
-        usrp->set_rx_gain(30,"");
-
-        uhd::stream_args_t rx_stream_args("fc64", "sc16");
-        uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(rx_stream_args);
-
-        int N = 64;
-
-        size_t bytes_per_samp = uhd::convert::get_bytes_per_item("fc32");
-        std::cout<<"Bytes per sample: "<<bytes_per_samp<<std::endl;
-        std::vector< std::complex<double> > buff(N);
-        std::vector<void*> buffs;
-        buffs.push_back(&buff.front());
-
-        std::vector< std::complex<double> > out_buff(N);
-
-        uhd::rx_metadata_t meta;
-
-        uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
-
-        cmd.stream_now = true;
-
-        rx_stream->issue_stream_cmd(cmd);
-
-        boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
-
-        size_t recv_samps = rx_stream->recv(buffs, N, meta);
-
-        fftw_complex *in, *out;
-        fftw_plan p;
-
-        in = reinterpret_cast<fftw_complex*>(&buff.front());
-        out = reinterpret_cast<fftw_complex*>(&out_buff.front());
-
-        p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
-
-        fftw_execute(p); /* repeat as needed */
-        for(int jj = 0; jj < N; jj++)
-        {
-            double fft_mag = 20.0f * log10((1.0f / N) * sqrt(pow(out_buff[jj].real(), 2) + pow(out_buff[jj].imag(), 2)));
-            std::cout<<20*log10(fft_mag)<<" ";
-        }
     }
 
     std::cout<<std::endl;
